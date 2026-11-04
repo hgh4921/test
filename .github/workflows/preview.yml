@@ -1,0 +1,39 @@
+name: Publish meal planner preview
+
+# Publishing is a deliberate manual action; pushing code does not publish it.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: meal-planner-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify recipe data and assets
+        run: node prototype/verify-recipes.cjs
+      - name: Build static preview
+        run: python3 scripts/build-preview.py
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish preview
+        id: deployment
+        uses: actions/deploy-pages@v4
