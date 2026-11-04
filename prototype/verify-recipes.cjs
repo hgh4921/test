@@ -9,9 +9,33 @@ const document = {
  querySelector(selector) { return elements[selector] ??= {value:'', innerHTML:'', textContent:'', addEventListener(){}}; },
  querySelectorAll(){return [];}, addEventListener(){}
 };
+// A deterministic stream makes failures reproducible across local and CI runs.
+let seed = 4921;
+const testMath = Object.create(Math);
+testMath.random = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 2 ** 32);
 const data = vm.runInNewContext(html.match(/<script>([\s\S]*?)<\/script>/)[1] + `
-JSON.stringify({meals,dinners,photos:meals.map((m,i)=>photo(i)),plans:Array.from({length:100},()=>suggestPlan()),types:meals.map(m=>m.type)})`, {document, Date, Intl, Map, Set});
-const { meals, dinners, photos, plans } = JSON.parse(data);
+const testPlans=Array.from({length:1000},()=>suggestPlan());
+const replacedPlans=[];
+for(const original of testPlans.slice(0,200)){
+ const changed=[...original];
+ for(let day=0;day<7;day++){
+  const replacement=replacementForDay(changed,day);
+  if(replacement!==undefined){changed[day]=replacement;replacedPlans.push([...changed]);}
+ }
+}
+// These checks use concrete names to guard the requested grouping behavior.
+if(soupFamily({name:'배추된장국'})!==soupFamily({name:'두부된장찌개'}))throw Error('Doenjang group');
+if(soupFamily({name:'콩나물국'})!==soupFamily({name:'황태콩나물국'}))throw Error('Sprout group');
+const monday=dinners.findIndex(d=>d.dishes.some(id=>meals[id].name==='애호박된장국'));
+const otherDoenjang=dinners.findIndex((d,index)=>d.dishes.some(id=>meals[id].name==='배추된장국')&&dinnerParts[index].main!==dinnerParts[monday].main);
+if(monday<0||otherDoenjang<0)throw Error('Missing example dinners');
+if(isDinnerCompatible(otherDoenjang,2,[monday]))throw Error('Monday to Wednesday must be blocked');
+if(!isDinnerCompatible(otherDoenjang,3,[monday]))throw Error('Monday to Thursday must be allowed');
+if(!isDinnerCompatible(otherDoenjang,4,[monday]))throw Error('Monday to Friday must be allowed');
+if(isDinnerCompatible(monday,6,[monday]))throw Error('Same soup must not recur within week');
+if(isDinnerCompatible(otherDoenjang,0,[null,null,monday]))throw Error('Replacement must check following days');
+JSON.stringify({meals,dinners,photos:meals.map((m,i)=>photo(i)),plans:testPlans,replacedPlans,families:meals.map(m=>m.type==='국/찌개'?soupFamily(m):null)})`, {document, Date, Intl, Map, Set, Math:testMath});
+const { meals, dinners, photos, plans, replacedPlans, families } = JSON.parse(data);
 assert.equal(meals.length, 125);
 assert.equal(new Set(meals.map(m=>m.name)).size, 125);
 for (const recipe of meals) {
@@ -30,10 +54,17 @@ for (const dinner of dinners) {
  if (dinner.kind==='한 그릇') {assert.equal(dinner.dishes.length,1);assert.equal(meals[dinner.dishes[0]].type,'한 그릇');}
  else for (const type of ['국/찌개','메인메뉴','밑반찬']) assert(dinner.dishes.some(id=>meals[id].type===type));
 }
-for (const plan of plans) {
+for (const plan of [...plans,...replacedPlans]) {
  assert.equal(plan.length,7); assert.equal(new Set(plan).size,7);
  const mainRecipes = plan.map(id=>dinners[id].dishes.find(i=>['한 그릇','메인메뉴'].includes(meals[i].type)));
  assert.equal(new Set(mainRecipes).size,7);
+ const soups = plan.map(id=>dinners[id].dishes.find(i=>meals[i].type==='국/찌개'));
+ const soupIds = soups.filter(id=>id!==undefined);
+ assert.equal(new Set(soupIds).size,soupIds.length,'Same soup repeats within a week');
+ for(let day=0;day<soups.length;day++)for(let next=day+1;next<soups.length;next++){
+  if(soups[day]===undefined||soups[next]===undefined)continue;
+  if(families[soups[day]]===families[soups[next]])assert(next-day>=3,'Similar soups need a three-day gap');
+ }
 }
 assert.equal(photos.length,125);
 for (let id=0;id<photos.length;id++) assert(photos[id].includes(`data-recipe-photo="${id}"`));
@@ -48,5 +79,5 @@ for (const imagePath of imagePaths) {
  if(imagePath.includes('batch-')) assert(Math.abs(width/height-3/4)<0.01, imagePath);
 }
 fs.writeFileSync(path.join(__dirname,'recipes.json'),JSON.stringify(meals,null,2)+'\n');
-console.log('PASS: 125 unique recipes; 2/4-person ingredients; complete dinners; 100 weekly plans; 125 photo mappings; 11 existing image atlases.');
+console.log(`PASS: 125 recipes; 1000 weekly plans; ${replacedPlans.length} day replacements; unique soups and mains; similar soups at least 3 days apart; portions and photos.`);
 console.log('Categories:',Object.fromEntries(['국/찌개','메인메뉴','밑반찬','한 그릇'].map(type=>[type,meals.filter(m=>m.type===type).length])));
