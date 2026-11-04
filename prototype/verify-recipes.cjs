@@ -34,6 +34,18 @@ if(!isDinnerCompatible(otherDoenjang,3,[monday]))throw Error('Monday to Thursday
 if(!isDinnerCompatible(otherDoenjang,4,[monday]))throw Error('Monday to Friday must be allowed');
 if(isDinnerCompatible(monday,6,[monday]))throw Error('Same soup must not recur within week');
 if(isDinnerCompatible(otherDoenjang,0,[null,null,monday]))throw Error('Replacement must check following days');
+// Shopping checkboxes mean "missing at home", including basic seasonings.
+plan=[0,1,2,3,4,5,6];
+shoppingSelection.clear();
+if(purchaseItems().length!==0)throw Error('Shopping should start with no selected ingredients');
+shoppingSelection.add('달걀');shoppingSelection.add('진간장');
+if(purchaseItems().length!==2||!purchaseItems().some(x=>x.name==='진간장'))throw Error('Only selected ingredients, including staples, should be purchased');
+shoppingSelection.delete('달걀');
+if(purchaseItems().some(x=>x.name==='달걀'))throw Error('Unchecked ingredient must be excluded');
+const noSelectedIngredients=dinners.findIndex(d=>d.dishes.every(id=>meals[id].items.every(x=>x.name!=='진간장')));
+plan=Array(7).fill(noSelectedIngredients);
+if(purchaseItems().length!==0)throw Error('Selection outside the current plan must not be purchased');
+shoppingSelection.clear();
 JSON.stringify({meals,dinners,photos:meals.map((m,i)=>photo(i)),plans:testPlans,replacedPlans,families:meals.map(m=>m.type==='국/찌개'?soupFamily(m):null)})`, {document, Date, Intl, Map, Set, Math:testMath});
 const { meals, dinners, photos, plans, replacedPlans, families } = JSON.parse(data);
 assert.equal(meals.length, 149);
@@ -79,5 +91,5 @@ for (const imagePath of imagePaths) {
  if(imagePath.includes('batch-')) assert(Math.abs(width/height-3/4)<0.01, imagePath);
 }
 fs.writeFileSync(path.join(__dirname,'recipes.json'),JSON.stringify(meals,null,2)+'\n');
-console.log(`PASS: 149 recipes; 1000 weekly plans; ${replacedPlans.length} day replacements; unique soups and mains; similar soups at least 3 days apart; portions and photos.`);
+console.log(`PASS: 149 recipes; 1000 weekly plans; ${replacedPlans.length} day replacements; soup spacing; select-to-buy shopping; portions and photos.`);
 console.log('Categories:',Object.fromEntries(['국/찌개','메인메뉴','밑반찬','한 그릇'].map(type=>[type,meals.filter(m=>m.type===type).length])));
