@@ -36,8 +36,8 @@ if(isDinnerCompatible(monday,6,[monday]))throw Error('Same soup must not recur w
 if(isDinnerCompatible(otherDoenjang,0,[null,null,monday]))throw Error('Replacement must check following days');
 JSON.stringify({meals,dinners,photos:meals.map((m,i)=>photo(i)),plans:testPlans,replacedPlans,families:meals.map(m=>m.type==='국/찌개'?soupFamily(m):null)})`, {document, Date, Intl, Map, Set, Math:testMath});
 const { meals, dinners, photos, plans, replacedPlans, families } = JSON.parse(data);
-assert.equal(meals.length, 125);
-assert.equal(new Set(meals.map(m=>m.name)).size, 125);
+assert.equal(meals.length, 149);
+assert.equal(new Set(meals.map(m=>m.name)).size, 149);
 for (const recipe of meals) {
  assert(recipe.time > 0 && recipe.tip && recipe.steps.length >= 3 && recipe.items.length >= 3, recipe.name);
  const ingredients = new Set();
@@ -66,10 +66,10 @@ for (const plan of [...plans,...replacedPlans]) {
   if(families[soups[day]]===families[soups[next]])assert(next-day>=3,'Similar soups need a three-day gap');
  }
 }
-assert.equal(photos.length,125);
+assert.equal(photos.length,149);
 for (let id=0;id<photos.length;id++) assert(photos[id].includes(`data-recipe-photo="${id}"`));
 const imagePaths=[...html.matchAll(/url\("(assets\/[^"]+\.png)"\)/g)].map(m=>m[1]);
-assert.equal(new Set(imagePaths).size,11);
+assert.equal(new Set(imagePaths).size,13);
 for (const imagePath of imagePaths) {
  const buffer = fs.readFileSync(path.join(__dirname,imagePath));
  assert.equal(buffer.subarray(1,4).toString(),'PNG');
@@ -79,5 +79,5 @@ for (const imagePath of imagePaths) {
  if(imagePath.includes('batch-')) assert(Math.abs(width/height-3/4)<0.01, imagePath);
 }
 fs.writeFileSync(path.join(__dirname,'recipes.json'),JSON.stringify(meals,null,2)+'\n');
-console.log(`PASS: 125 recipes; 1000 weekly plans; ${replacedPlans.length} day replacements; unique soups and mains; similar soups at least 3 days apart; portions and photos.`);
+console.log(`PASS: 149 recipes; 1000 weekly plans; ${replacedPlans.length} day replacements; unique soups and mains; similar soups at least 3 days apart; portions and photos.`);
 console.log('Categories:',Object.fromEntries(['국/찌개','메인메뉴','밑반찬','한 그릇'].map(type=>[type,meals.filter(m=>m.type===type).length])));
